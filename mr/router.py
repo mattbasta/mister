@@ -19,22 +19,27 @@ class Router(object):
             self.data[pattern] = []
         self.data[pattern].append(datum)
 
+    def _gather_data(self, pattern):
+        "Returns a list of data to be processed"
+        if pattern not in self.hooks["filter"]:
+            return self.data[pattern][:]
+
+        data = []
+        filters = self.hooks["filter"][pattern]
+        for datum in self.data[pattern]:
+            if any(filter_(datum) for
+                   filter_ in
+                   filters):
+                continue
+            data.append(datum)
+        return data
+
     def process(self):
         "Processes the data and yields the result"
         
         while self.data:
-            for pattern, orig_data in self.data.items():
-                data = []
-                if pattern in self.hooks["filter"]:
-                    filters = self.hooks["filter"][pattern]
-                    for datum in orig_data:
-                        if any(filter_(datum) for
-                               filter_ in
-                               filters):
-                            continue
-                        data.append(datum)
-                else:
-                    data = orig_data[:]
+            for pattern in self.data.keys():
+                data = self._gather_data(pattern)
 
                 # The original data is now useless
                 del self.data[pattern]
