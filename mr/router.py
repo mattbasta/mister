@@ -21,11 +21,11 @@ class Router(object):
 
     def _gather_data(self, pattern):
         "Returns a list of data to be processed"
-        if pattern not in self.hooks["filter"]:
+        if pattern not in self.hooks[FILTER]:
             return self.data[pattern][:]
 
         data = []
-        filters = self.hooks["filter"][pattern]
+        filters = self.hooks[FILTER][pattern]
         for datum in self.data[pattern]:
             if any(filter_(datum) for
                    filter_ in
@@ -46,12 +46,12 @@ class Router(object):
 
                 if pattern in self.hooks[MAP]:
                     for datum in data:
-                        for pattern, new_datum in self.hooks[MAP][pattern](datum):
-                            self.feed(pattern, new_datum)
+                        for new_pattern, new_datum in self.hooks[MAP][pattern](datum):
+                            self.feed(new_pattern, new_datum)
                 elif pattern in self.hooks[REDUCE]:
                     for reducer in self.hooks[REDUCE]:
-                        for pattern, datum in reducer(data):
-                            self.feed(pattern, datum)
+                        for new_pattern, datum in reducer(data):
+                            self.feed(new_pattern, datum)
                 else:
                     yield pattern, data
 

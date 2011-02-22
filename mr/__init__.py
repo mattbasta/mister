@@ -2,32 +2,45 @@ import re
 from router import Router
 from constants import *
 
-router_instance = Router()
-process = router_instance.process
+class Processor(object):
+    "Sets up the correct router"
+
+    def __init__(self):
+        self.router = Router()
+
+    def set_router(self, router):
+        self.router = router
+
+_processor = Processor()
+
+def process():
+    "Initiates the Router's processor"
+    return _processor.router.process()
+
+def set_router(instance):
+    "Sets a new router"
+    _processor.set_router(instance)
 
 def feed(pattern, datum):
     "Feeds a raw blob of data into the queue for type 'pattern'"
-    if not router_instance:
-        return
-    router_instance.feed(pattern, datum)
+    _processor.router.feed(pattern, datum)
 
 def reset_hooks():
     "Removes all hooks from the router"
-    router_instance.reset_hooks()
+    _processor.router.reset_hooks()
 
 def hook(stage, pattern):
     "Registers mister hooks for stage with pattern"
     def wrap(function):
-        if stage not in router_instance.hooks:
+        r = _processor.router
+        if stage not in r.hooks:
             raise Exception("Could not find hook stage '%s'" % stage)
         if stage == FILTER:
-            if pattern not in router_instance.hooks[stage]:
-                router_instance.hooks[stage][pattern] = []
-            router_instance.hooks[stage][pattern].append(function)
+            if pattern not in r.hooks[stage]:
+                r.hooks[stage][pattern] = []
+            r.hooks[stage][pattern].append(function)
         else:
-            router_instance.hooks[stage][pattern] = function
+            r.hooks[stage][pattern] = function
         return function
     return wrap
-
-
 

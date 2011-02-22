@@ -21,9 +21,9 @@ class DiskRouter(Router):
         if pattern not in self.data:
             self.data[pattern] = \
                 tempfile.SpooledTemporaryFile(max_size=self.spool_size)
-        self.data[pattern].write("%s\n" %
-                                    cPickle.dumps(datum,
-                                                  cPickle.HIGHEST_PROTOCOL))
+        cPickle.dump(datum,
+                     self.data[pattern],
+                     protocol=cPickle.HIGHEST_PROTOCOL)
 
     def _gather_data(self, pattern):
         "Yields iterables of processable data"
@@ -36,13 +36,15 @@ class DiskRouter(Router):
 
         data = []
         size = 0
-        for buffered_datum in spool:
-            size += len(buffered_datum)
-            datum = cPickle.loads(buffered_datum)
-            data.append(datum)
-            if size > self.spool_size:
-                yield data
-                data = []
+        try:
+            while True:
+                datum = cPickle.load(spool)
+                data.append(datum)
+                if spool.tell() > self.spool_size:
+                    yield data
+                    data = []
+        except EOFError:
+            pass
 
         spool.close()
         if data:
@@ -50,7 +52,6 @@ class DiskRouter(Router):
 
     def process(self):
         "Processes the data and yields the result"
-
         while self.data:
             for pattern in self.data.keys():
                 data_generator = self._gather_data(pattern)
