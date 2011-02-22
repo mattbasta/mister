@@ -7,7 +7,7 @@ class DiskRouter(Router):
     "A baseline object that routes mister data within a single thread"
 
     def __init__(self, spool_size=4096):
-        Router.__init__()
+        Router.__init__(self)
         self.spool_size = spool_size
 
     def feed(self, pattern, datum):
@@ -15,7 +15,7 @@ class DiskRouter(Router):
 
         # We filter beforehand to prevent unnecessary disk writes/pickles
         if pattern in self.hooks[FILTER]:
-            if any(filter_(datum) for filter_ in self.hooks[FILTER][pattern]:
+            if any(filter_(datum) for filter_ in self.hooks[FILTER][pattern]):
                 return
 
         if pattern not in self.data:
