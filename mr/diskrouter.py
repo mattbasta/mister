@@ -61,9 +61,8 @@ class DiskRouter(Router):
                             for pattern, new_datum in self.hooks[MAP][pattern](datum):
                                 self.feed(pattern, new_datum)
                     elif pattern in self.hooks[REDUCE]:
-                        for reducer in self.hooks[REDUCE]:
-                            for pattern, datum in reducer(data):
-                                self.feed(pattern, datum)
+                        for pattern, datum in self.hooks[REDUCE][pattern](data):
+                            self.feed(pattern, datum)
                     else:
                         yield pattern, data
 
