@@ -100,7 +100,7 @@ class ForkingRouter(Router):
         while self.data:
             # Write lots
             for pattern in self.data.keys():
-                fork = self.get_pattern_forklet(pattern)
+                fork = self._get_pattern_forklet(pattern)
                 for datum in self.data[pattern]:
                     fork.feed(pattern, datum)
 
@@ -110,7 +110,8 @@ class ForkingRouter(Router):
                 # are fed to a fork that has completed data, we'll never get
                 # our data back.
                 for pattern, datum in fork.collect():
-                   self._queue(pattern, datum)
+                    print pattern, datum
+                    self._queue(pattern, datum)
 
             time.sleep(0.01) # Give some time back to the forks
 
@@ -169,22 +170,6 @@ class Forklet(object):
         if prespawn:
             self.fork()
 
-    def _process_datum(self, pattern, datum):
-        "Processes a datum"
-        if pattern in self.router.hooks[mr.FILTER] and \
-           any(filter_(datum) for
-               filter_ in
-               self.router.hooks[mr.FILTER][pattern]):
-            return # Just ignore the datum and continue
-        elif pattern in self.router.hooks[mr.MAP]:
-            for new_pattern, new_datum in \
-                self.router.hooks[mr.MAP][pattern](datum):
-                yield new_pattern, new_datum
-        else:
-            # There's no hook for the pattern, so return the
-            # datum to the router.
-            yield pattern, datum
-
     def fork(self):
         "Forks the process and handles where processing should go"
         self.pid = os.fork()
@@ -205,14 +190,23 @@ class Forklet(object):
 
             # Process and output
             if self.startwork:
+                for pattern in self.queue.keys():
+                    slice = self.queue[pattern][:]
+                    del self.queue[pattern]
+
+                    if pattern in self.router.hooks[mr.REDUCE]:
+                        for new_pattern, datum in self.router.hooks[mr.REDUCE][pattern](slice):
+                            self.submit(new_pattern, datum)
+                    elif pattern in self.router.hooks[mr.MAP]:
+                        for datum in slice:
+                            for new_pattern, new_datum in self.router.hooks[mr.MAP][pattern](datum):
+                                self.submit(new_pattern, new_datum)
+                    else:
+                        for datum in slice:
+                            self.submit(pattern, datum)
                 
-                
-            incoming_object = cPickle.load(self._rpipe)
-            if isinstance(incoming_object, ForkTask):
-                self.pattern.add(incoming_object.pattern)
-                continue
-            else:
-                self.process(self.pattern, incoming_object)
+                if not self.queue:
+                    self._write_submission(ForkComplete())
 
             time.sleep(0.01) # Read somewhere that this is what you should do
         
@@ -227,7 +221,6 @@ class Forklet(object):
         if pattern not in self.patterns:
             self.patterns.add(pattern)
         
-        cPickle.clear_memo()
         cPickle.dump((pattern, datum),
                      self.input_w,
                      protocol=cPickle.HIGHEST_PROTOCOL)
@@ -235,11 +228,25 @@ class Forklet(object):
 
     def submit(self, pattern, datum):
         "Sends a completed datum back to the router"
-        cPickle.clear_memo()
-        cPickle.dump((pattern, datum),
-                     self._wpipe,
+
+        if pattern in self.router.hooks[mr.FILTER] and \
+           any(filter_(datum) for
+               filter_ in
+               self.router.hooks[mr.FILTER][pattern]):
+            return
+
+        if pattern in self.queue or not self.router.homogeneous:
+            self._queue(pattern, datum)
+            return
+
+        self._write_submission((pattern, datum))
+
+    def _write_submission(self, blob):
+        "Submits a picklable blob to the router"
+        cPickle.dump(blob,
+                     self.output_w,
                      protocol=cPickle.HIGHEST_PROTOCOL)
-        self._wpipe.flush()
+        self.output_w.flush()
 
     def collect(self):
         "Yields completed pattern-datum pairs."
@@ -281,4 +288,6 @@ class Forklet(object):
                         break
                     else:
                         continue
+                else:
+                    yield outbound # We'll assume it's a 2-tuple
 
