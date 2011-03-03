@@ -1,5 +1,7 @@
 import mr
+import routers
 
+@routers.test_multi
 def test_exists():
     "Makes sure that a registered mapper exists as a hook"
     
@@ -10,6 +12,7 @@ def test_exists():
 
     assert mr.router_instance.hooks["map"]
 
+@routers.test_multi
 def test_filter_list():
     "Tests that filters are placed in a list"
 

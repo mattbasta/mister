@@ -1,5 +1,7 @@
 import mr
+import routers
 
+@routers.test_multi
 def test_foobar():
     mr.reset_hooks()
     
@@ -18,6 +20,7 @@ def test_foobar():
     print results
     assert results[0] == ("abc", [2])
 
+@routers.test_multi
 def test_recursive():
     mr.reset_hooks()
 
