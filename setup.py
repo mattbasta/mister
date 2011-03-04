@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     me='mister',
-    version='0.5',
+    version='0.6',
     description='A friendly, simple map/reduce library.',
     long_description=open('README').read(),
     author='Matt Basta',
@@ -17,7 +17,7 @@ setup(
                                               if not p.startswith('#')],
     scripts=[],
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Environment :: No Input/Output (Daemon)',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: BSD License',

@@ -1,10 +1,17 @@
-Mister v0.5 BETA
+Mister v0.6 BETA
 ================
 A simple, friendly map/filter/reduce library.
 
 Mister makes it easy to process lists of data. With a super-simple API based
 around Python generators, simple tasks that might otherwise require custom
 scripts or Hadoop now take just a few lines of code.
+
+Features:
+
+- Mapping, reducing, filtering
+- Beautiful Python decorators
+- Disk buffering
+- Process forking for multi-core support
 
 How to use it:
 
@@ -45,15 +52,10 @@ How to use it:
 
 
 
-Near-Future Enhancements:
-
-- Queue size limits/throttling
-
-
 Future Enhancements:
 
-- Multiprocessor support
-- Support for multiple servers
+- Support for multiple servers ("bean server")
+- Support for drop-in hooks ("rogers")
 
 
 "It's a beautiful day in the neighborhood,
