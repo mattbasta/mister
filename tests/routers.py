@@ -6,6 +6,8 @@ from mr.forkingrouter import ForkingRouter
 def test_multi(test):
     "Runs a test on multiple routers"
     def test_wrap():
+        print test.__name__
+        
         # Router
         print "Running: Router"
         mr.reset_hooks()

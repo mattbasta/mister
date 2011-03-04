@@ -10,7 +10,7 @@ def test_exists():
     def _null(data):
         pass
 
-    assert mr.router_instance.hooks["map"]
+    assert mr._processor.router.hooks["map"]
 
 @routers.test_multi
 def test_filter_list():
@@ -21,5 +21,5 @@ def test_filter_list():
     def test(data):
         pass
 
-    assert isinstance(mr.router_instance.hooks["filter"]["foo"], list)
+    assert isinstance(mr._processor.router.hooks["filter"]["foo"], list)
 

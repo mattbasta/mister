@@ -65,7 +65,10 @@ class ForkingRouter(Router):
             # If we can have unlimited forks or we haven't hit our
             # maximum forks, create a new fork
             f = Forklet(router=self,
-                        pattern=pattern)
+                        pattern=pattern,
+                        prespawn=self.prespawn)
+            if not self.prespawn and self.processing:
+                f.fork()
             self.forks.append(f)
         else:
             # We've hit our fork limit
@@ -97,11 +100,18 @@ class ForkingRouter(Router):
         "Processes the data and yields the result"
         self.processing = True
 
-        while self.data:
+        for f in self.forks:
+            f._write_submission(ForkStart(), outbound=False)
+
+        while self.data or any(f.working for f in self.forks):
             # Write lots
             for pattern in self.data.keys():
                 fork = self._get_pattern_forklet(pattern)
-                for datum in self.data[pattern]:
+
+                slice = self.data[pattern]
+                del self.data[pattern]
+
+                for datum in slice:
                     fork.feed(pattern, datum)
 
             # Read lots
@@ -110,10 +120,12 @@ class ForkingRouter(Router):
                 # are fed to a fork that has completed data, we'll never get
                 # our data back.
                 for pattern, datum in fork.collect():
-                    print pattern, datum
+                    if pattern not in self.hooks[MAP] and \
+                       pattern not in self.hooks[REDUCE]:
+                        yield pattern, datum
                     self._queue(pattern, datum)
 
-            time.sleep(0.01) # Give some time back to the forks
+            time.sleep(0.5) # Give some time back to the forks
 
         self.processing = False
 
@@ -132,6 +144,10 @@ class ForkStart(ForkTimestamp):
     "Begins the processing process"
     pass
 
+class ForkPoison(object):
+    "Instructs a fork to die."
+    pass
+
 class Forklet(object):
     "A class to help with the division of work among forks"
     
@@ -142,6 +158,9 @@ class Forklet(object):
         self.is_child = False
         self.working = False
         self.startwork = not prespawn
+        self.die = False
+
+        print "Creating fork"
         
         # Initialize input/output pipes
 
@@ -181,40 +200,48 @@ class Forklet(object):
             # Relinquish control back to the router
             return True
 
+        #print "Forked"
+
         self.output_r.close()
         self.input_w.close()
 
-        while True:
+        while not self.die:
+            #print "Fork loop", self.is_child
             # Read in new datum
-            self.collect()
+            for pattern, datum in self.collect():
+                self.queue[pattern].append(datum)
 
             # Process and output
             if self.startwork:
+                #print "Work can begin"
                 for pattern in self.queue.keys():
+                    #print "Processing", pattern
                     slice = self.queue[pattern][:]
                     del self.queue[pattern]
 
-                    if pattern in self.router.hooks[mr.REDUCE]:
-                        for new_pattern, datum in self.router.hooks[mr.REDUCE][pattern](slice):
+                    if pattern in self.router.hooks[REDUCE]:
+                        for new_pattern, datum in self.router.hooks[REDUCE][pattern](slice):
                             self.submit(new_pattern, datum)
-                    elif pattern in self.router.hooks[mr.MAP]:
+                    elif pattern in self.router.hooks[MAP]:
                         for datum in slice:
-                            for new_pattern, new_datum in self.router.hooks[mr.MAP][pattern](datum):
+                            for new_pattern, new_datum in self.router.hooks[MAP][pattern](datum):
                                 self.submit(new_pattern, new_datum)
                     else:
+                        self.patterns.discard(pattern)
                         for datum in slice:
                             self.submit(pattern, datum)
                 
                 if not self.queue:
                     self._write_submission(ForkComplete())
 
-            time.sleep(0.01) # Read somewhere that this is what you should do
+            time.sleep(1) # Read somewhere that this is what you should do
         
-        # When a fork dies, we don't want it to resume in the router
         sys.exit(1)
 
     def feed(self, pattern, datum):
         "Sends an unprocessed datum to the fork"
+
+        #print "Feeding", datum
 
         self.working = time.time()
 
@@ -229,10 +256,10 @@ class Forklet(object):
     def submit(self, pattern, datum):
         "Sends a completed datum back to the router"
 
-        if pattern in self.router.hooks[mr.FILTER] and \
+        if pattern in self.router.hooks[FILTER] and \
            any(filter_(datum) for
                filter_ in
-               self.router.hooks[mr.FILTER][pattern]):
+               self.router.hooks[FILTER][pattern]):
             return
 
         if pattern in self.queue or not self.router.homogeneous:
@@ -241,20 +268,23 @@ class Forklet(object):
 
         self._write_submission((pattern, datum))
 
-    def _write_submission(self, blob):
+    def _write_submission(self, blob, outbound=True):
         "Submits a picklable blob to the router"
+        #print "Writing", blob
+        p = self.output_w if outbound else self.input_w
         cPickle.dump(blob,
-                     self.output_w,
+                     p,
                      protocol=cPickle.HIGHEST_PROTOCOL)
-        self.output_w.flush()
+        p.flush()
 
     def collect(self):
         "Yields completed pattern-datum pairs."
-
+        #print "Collecting", self.is_child
         if self.is_child:
             while True:
                 try:
                     inbound = cPickle.load(self.input_r)
+                    #print "Received inbound", inbound
                 except:
                     # Nothing to read, carry on
                     break
@@ -263,6 +293,9 @@ class Forklet(object):
                 if isinstance(inbound, ForkStart):
                     self.startwork = True
                     continue
+                elif isinstance(inbound, ForkPoison):
+                    self.die = True
+                    return
                 
                 self.working = True
 
@@ -271,20 +304,20 @@ class Forklet(object):
 
                 if pattern not in self.queue:
                     self.queue[pattern] = []
-                self.queue[pattern].append(datum)
+
+                yield pattern, datum
 
         else:
             while True:
                 try:
                     outbound = cPickle.load(self.output_r)
+                    #print "Received outbound"
                 except:
                     break
 
                 if isinstance(outbound, ForkComplete):
                     if outbound.timestamp > self.working:
-                        ######
-                        # What happens when a fork is done?
-                        ######
+                        self.working = False
                         break
                     else:
                         continue
