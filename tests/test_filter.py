@@ -1,9 +1,9 @@
 import mr
+import routers
 
+@routers.test_multi
 def test_simple_filter():
     "Tests that simple filters work"
-
-    mr.reset_hooks()
 
     @mr.hook(mr.FILTER, "filterable")
     def delete_even(input):

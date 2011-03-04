@@ -1,11 +1,12 @@
 import tempfile
 import cPickle
 import fcntl
-import time
-import os
-import sys
+import signal
+import os, sys, time
 from router import Router
 from constants import MAP, FILTER, REDUCE
+
+PERIOD = 0.05
 
 class ForkingRouter(Router):
     "A baseline object that routes mister data within a single thread"
@@ -120,13 +121,19 @@ class ForkingRouter(Router):
                 # are fed to a fork that has completed data, we'll never get
                 # our data back.
                 for pattern, datum in fork.collect():
-                    if pattern not in self.hooks[MAP] and \
-                       pattern not in self.hooks[REDUCE]:
-                        yield pattern, datum
                     self._queue(pattern, datum)
 
-            time.sleep(0.5) # Give some time back to the forks
+            # Yield data with no reducers or mappers
+            for pattern in self.data.keys():
+                if pattern not in self.hooks[MAP] and \
+                   pattern not in self.hooks[REDUCE]:
+                    yield pattern, self.data[pattern]
+                    del self.data[pattern]
 
+            time.sleep(PERIOD) # Give some time back to the forks
+
+        for f in self.forks:
+            f._write_submission(ForkPoison(), outbound=False)
         self.processing = False
 
 class ForkTimestamp(object):
@@ -160,7 +167,7 @@ class Forklet(object):
         self.startwork = not prespawn
         self.die = False
 
-        print "Creating fork"
+        #print "Creating fork"
         
         # Initialize input/output pipes
 
@@ -200,27 +207,26 @@ class Forklet(object):
             # Relinquish control back to the router
             return True
 
-        #print "Forked"
 
         self.output_r.close()
         self.input_w.close()
 
         while not self.die:
-            #print "Fork loop", self.is_child
             # Read in new datum
             for pattern, datum in self.collect():
                 self.queue[pattern].append(datum)
 
             # Process and output
-            if self.startwork:
-                #print "Work can begin"
+            if self.startwork and self.queue:
                 for pattern in self.queue.keys():
-                    #print "Processing", pattern
                     slice = self.queue[pattern][:]
                     del self.queue[pattern]
 
                     if pattern in self.router.hooks[REDUCE]:
-                        for new_pattern, datum in self.router.hooks[REDUCE][pattern](slice):
+                        gen = self.router.hooks[REDUCE][pattern](slice)
+                        if gen is None:
+                            continue
+                        for new_pattern, datum in gen:
                             self.submit(new_pattern, datum)
                     elif pattern in self.router.hooks[MAP]:
                         for datum in slice:
@@ -234,20 +240,20 @@ class Forklet(object):
                 if not self.queue:
                     self._write_submission(ForkComplete())
 
-            time.sleep(1) # Read somewhere that this is what you should do
+            time.sleep(PERIOD) # Read somewhere that this is what you should do
         
-        sys.exit(1)
+        os._exit(0)
 
     def feed(self, pattern, datum):
         "Sends an unprocessed datum to the fork"
-
-        #print "Feeding", datum
 
         self.working = time.time()
 
         if pattern not in self.patterns:
             self.patterns.add(pattern)
         
+        #print ">>", self.pid, pattern, datum
+
         cPickle.dump((pattern, datum),
                      self.input_w,
                      protocol=cPickle.HIGHEST_PROTOCOL)
@@ -261,7 +267,8 @@ class Forklet(object):
                filter_ in
                self.router.hooks[FILTER][pattern]):
             return
-
+        
+        #print "<", pattern, datum
         if pattern in self.queue or not self.router.homogeneous:
             self._queue(pattern, datum)
             return
@@ -270,7 +277,7 @@ class Forklet(object):
 
     def _write_submission(self, blob, outbound=True):
         "Submits a picklable blob to the router"
-        #print "Writing", blob
+        #print "<" if outbound else ">>", blob
         p = self.output_w if outbound else self.input_w
         cPickle.dump(blob,
                      p,
@@ -279,12 +286,11 @@ class Forklet(object):
 
     def collect(self):
         "Yields completed pattern-datum pairs."
-        #print "Collecting", self.is_child
         if self.is_child:
             while True:
                 try:
                     inbound = cPickle.load(self.input_r)
-                    #print "Received inbound", inbound
+                    #print ">", inbound
                 except:
                     # Nothing to read, carry on
                     break
@@ -311,7 +317,7 @@ class Forklet(object):
             while True:
                 try:
                     outbound = cPickle.load(self.output_r)
-                    #print "Received outbound"
+                    #print "<<", self.pid, outbound
                 except:
                     break
 

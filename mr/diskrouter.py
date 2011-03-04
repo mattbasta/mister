@@ -56,13 +56,16 @@ class DiskRouter(Router):
             for pattern in self.data.keys():
                 data_generator = self._gather_data(pattern)
                 for data in data_generator:
-                    if pattern in self.hooks[MAP]:
+                    if pattern in self.hooks[REDUCE]:
+                        gen = self.hooks[REDUCE][pattern](data)
+                        if gen is None:
+                            continue
+                        for pattern, datum in gen:
+                            self.feed(pattern, datum)
+                    elif pattern in self.hooks[MAP]:
                         for datum in data:
                             for pattern, new_datum in self.hooks[MAP][pattern](datum):
                                 self.feed(pattern, new_datum)
-                    elif pattern in self.hooks[REDUCE]:
-                        for pattern, datum in self.hooks[REDUCE][pattern](data):
-                            self.feed(pattern, datum)
                     else:
                         yield pattern, data
 

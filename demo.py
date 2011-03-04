@@ -1,6 +1,6 @@
 import mr
-from mr.diskrouter import DiskRouter
-mr.set_router(DiskRouter())
+from mr.forkingrouter import ForkingRouter
+mr.set_router(ForkingRouter())
 
 @mr.hook(mr.MAP, "query")
 def parse_query(query):

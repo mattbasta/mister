@@ -44,14 +44,16 @@ class Router(object):
                 # The original data is now useless
                 del self.data[pattern]
 
-                if pattern in self.hooks[MAP]:
+                if pattern in self.hooks[REDUCE]:
+                    gen = self.hooks[REDUCE][pattern](data)
+                    if gen is None:
+                        continue
+                    for new_pattern, datum in gen:
+                        self.feed(new_pattern, datum)
+                elif pattern in self.hooks[MAP]:
                     for datum in data:
                         for new_pattern, new_datum in self.hooks[MAP][pattern](datum):
                             self.feed(new_pattern, new_datum)
-                elif pattern in self.hooks[REDUCE]:
-                    for reducer in self.hooks[REDUCE]:
-                        for new_pattern, datum in reducer(data):
-                            self.feed(new_pattern, datum)
                 else:
                     yield pattern, data
 
