@@ -1,22 +1,27 @@
 Mister v0.6 BETA
 ================
+
 A simple, friendly map/filter/reduce library.
 
 Mister makes it easy to process lists of data. With a super-simple API based
 around Python generators, simple tasks that might otherwise require custom
 scripts or Hadoop now take just a few lines of code.
 
-Features:
+Features
+--------
 
 - Mapping, reducing, filtering
 - Beautiful Python decorators
 - Disk buffering
 - Process forking for multi-core support
 
-How to use it:
+Sample Code
+-----------
+
+::
 
     import mr
-    
+
     # Add a mapper
     @mr.hook(mr.MAP, "log entry")
     def parse_entry(entry):
@@ -50,9 +55,8 @@ How to use it:
             elif tag == "notice":
                 print "Simple notice: %s" % item
 
-
-
-Future Enhancements:
+Future Enhancements
+-------------------
 
 - Support for multiple servers ("bean server")
 - Support for drop-in hooks ("rogers")
