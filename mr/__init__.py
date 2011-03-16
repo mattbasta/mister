@@ -13,9 +13,18 @@ class Processor(object):
 
 _processor = Processor()
 
-def process():
+def process(as_lists=False):
     "Initiates the Router's processor"
-    return _processor.router.process()
+    output = _processor.router.process()
+    if as_lists:
+        # Wrap the router in a generator to yield as lists
+        def list_wrap(gen):
+            for pattern, datums in gen:
+                yield pattern, list(datums)
+        return list_wrap(output)
+
+    # Otherwise, just output the standard generator
+    return output
 
 def set_router(instance):
     "Sets a new router"
