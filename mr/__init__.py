@@ -1,6 +1,6 @@
 import re
 from router import Router
-from constants import *
+
 
 class Processor(object):
     "Sets up the correct router"
@@ -12,6 +12,8 @@ class Processor(object):
         self.router = router
 
 _processor = Processor()
+set_router = _processor.set_router
+
 
 def process(as_lists=False):
     "Initiates the Router's processor"
@@ -26,30 +28,42 @@ def process(as_lists=False):
     # Otherwise, just output the standard generator
     return output
 
-def set_router(instance):
-    "Sets a new router"
-    _processor.set_router(instance)
 
 def feed(pattern, datum):
     "Feeds a raw blob of data into the queue for type 'pattern'"
     _processor.router.feed(pattern, datum)
 
+
 def reset_hooks():
     "Removes all hooks from the router"
     _processor.router.reset_hooks()
 
-def hook(stage, pattern):
-    "Registers mister hooks for stage with pattern"
+
+def map(pattern):
+    """Register a mapping function for a pattern."""
     def wrap(function):
         r = _processor.router
-        if stage not in r.hooks:
-            raise Exception("Could not find hook stage '%s'" % stage)
-        if stage == FILTER:
-            if pattern not in r.hooks[stage]:
-                r.hooks[stage][pattern] = []
-            r.hooks[stage][pattern].append(function)
-        else:
-            r.hooks[stage][pattern] = function
+        r.mappers[pattern] = function
+        return function
+    return wrap
+
+
+def reduce(pattern):
+    """Register a reducing function for a pattern."""
+    def wrap(function):
+        r = _processor.router
+        r.reducers[pattern] = function
+        return function
+    return wrap
+
+
+def filter(pattern):
+    """Register a mapping function for a pattern."""
+    def wrap(function):
+        r = _processor.router
+        if pattern not in r.filters:
+            r.filters[pattern] = []
+        r.filters[pattern].append(function)
         return function
     return wrap
 

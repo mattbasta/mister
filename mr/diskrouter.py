@@ -1,7 +1,6 @@
 import tempfile
 import cPickle
 from router import Router
-from constants import MAP, FILTER, REDUCE
 
 
 class DiskRouter(Router):

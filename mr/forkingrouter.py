@@ -4,7 +4,6 @@ import fcntl
 import signal
 import os, sys, time
 from router import Router
-from constants import MAP, FILTER, REDUCE
 
 PERIOD = 0.05
 
@@ -44,7 +43,7 @@ class ForkingRouter(Router):
                        filter_ in
                        self.hooks[FILTER][pattern]):
                     return
-        
+
         f = self._get_pattern_forklet(pattern)
         f.feed(pattern, datum)
 
@@ -56,7 +55,7 @@ class ForkingRouter(Router):
 
     def _get_pattern_forklet(self, pattern):
         "Returns a forklet object for a pattern"
-        
+
         if self.homogeneous and pattern in self.pattern_assignments:
             # If it's homogenous and an assignment already exists,
             # keep rolling with that pattern
@@ -138,7 +137,7 @@ class ForkingRouter(Router):
 
 class ForkTimestamp(object):
     "Just a timestamp object"
-    
+
     def __init__(self):
         self.timestamp = time.time()
 
@@ -157,7 +156,7 @@ class ForkPoison(object):
 
 class Forklet(object):
     "A class to help with the division of work among forks"
-    
+
     def __init__(self, router, pattern=None, prespawn=False):
         self.router = router
 
@@ -168,15 +167,15 @@ class Forklet(object):
         self.die = False
 
         #print "Creating fork"
-        
+
         # Initialize input/output pipes
 
         self.output_r, self.output_w = os.pipe()
         self.input_r, self.input_w = os.pipe()
-        
+
         out_rl = fcntl.fcntl(self.output_r, fcntl.F_GETFL)
         fcntl.fcntl(self.output_r, fcntl.F_SETFL, out_rl | os.O_NONBLOCK)
-        
+
         in_rl = fcntl.fcntl(self.input_r, fcntl.F_GETFL)
         fcntl.fcntl(self.input_r, fcntl.F_SETFL, in_rl | os.O_NONBLOCK)
 
@@ -236,12 +235,12 @@ class Forklet(object):
                         self.patterns.discard(pattern)
                         for datum in slice:
                             self.submit(pattern, datum)
-                
+
                 if not self.queue:
                     self._write_submission(ForkComplete())
 
             time.sleep(PERIOD) # Read somewhere that this is what you should do
-        
+
         os._exit(0)
 
     def feed(self, pattern, datum):
@@ -251,7 +250,7 @@ class Forklet(object):
 
         if pattern not in self.patterns:
             self.patterns.add(pattern)
-        
+
         #print ">>", self.pid, pattern, datum
 
         cPickle.dump((pattern, datum),
@@ -267,7 +266,7 @@ class Forklet(object):
                filter_ in
                self.router.hooks[FILTER][pattern]):
             return
-        
+
         #print "<", pattern, datum
         if pattern in self.queue or not self.router.homogeneous:
             self._queue(pattern, datum)
@@ -302,7 +301,7 @@ class Forklet(object):
                 elif isinstance(inbound, ForkPoison):
                     self.die = True
                     return
-                
+
                 self.working = True
 
                 pattern, datum = inbound

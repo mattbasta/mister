@@ -4,42 +4,44 @@ import routers
 @routers.test_multi
 def test_foobar():
     mr.reset_hooks()
-    
-    @mr.hook(mr.MAP, "foo")
+
+    @mr.map("foo")
     def process_foo(query):
-        yield "bar", query + 1
-    
-    @mr.hook(mr.MAP, "bar")
+        yield "bar", "from_foo", query.value + 1
+
+    @mr.map("bar")
     def process_bar(query):
-        yield "abc", query + 1
+        yield "abc", "from_bar", query.value + 1
 
     mr.feed("foo", 0)
-    
+
     results = list(mr.process())
     assert len(results) == 1
     print results
-    assert results[0] == ("abc", [2])
+    assert results[0].value == 2
 
 @routers.test_multi
 def test_recursive():
     mr.reset_hooks()
 
-    @mr.hook(mr.MAP, "ill")
+    @mr.map("ill")
     def hospital(input):
+        input = input.value
         if input == "pregger":
-            yield "healthy", "babby"
+            yield "healthy", "from_hospital", "babby"
         elif input == "chicken pox":
-            yield "healthy", "itchy"
+            yield "healthy", "from_hospital", "itchy"
 
-    @mr.hook(mr.MAP, "healthy")
+    @mr.map("healthy")
     def apartment(input):
+        input = input.value
         if input == "tummy":
-            yield "ill", "pregger"
+            yield "ill", "from_home", "pregger"
         elif input == "babby":
-            yield "ill", "chicken pox"
+            yield "ill", "from_home", "chicken pox"
         elif input == "itchy":
-            yield "medicine", "ointment"
+            yield "medicine", "from_home", "ointment"
 
     mr.feed("healthy", "tummy")
-    assert list(mr.process())[0] == ("medicine", ["ointment"])
+    assert list(mr.process())[0].value == "ointment"
 

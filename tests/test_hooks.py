@@ -4,32 +4,35 @@ import routers
 @routers.test_multi
 def test_exists():
     "Makes sure that a registered mapper exists as a hook"
-    
-    @mr.hook(mr.MAP, "foo")
+
+    @mr.map("foo")
     def _null(data):
         pass
 
-    assert mr._processor.router.hooks["map"]
+    assert mr._processor.router.mappers
+    assert "foo" in mr._processor.router.mappers
 
 @routers.test_multi
 def test_filter_list():
     "Tests that filters are placed in a list"
 
-    @mr.hook(mr.FILTER, "foo")
+    @mr.filter("foo")
     def test(data):
         pass
 
-    assert isinstance(mr._processor.router.hooks["filter"]["foo"], list)
+    assert mr._processor.router.filters
+    assert "foo" in mr._processor.router.filters
+    assert isinstance(mr._processor.router.filters["foo"], list)
 
 @routers.test_multi
 def test_reducer_precedence():
     "Tests that reducers take precedence over mappers"
 
-    @mr.hook(mr.REDUCE, "foo")
-    def red(data):
+    @mr.reduce("foo")
+    def red(data, rereduce):
         return
 
-    @mr.hook(mr.MAP, "foo")
+    @mr.map("foo")
     def m(datum):
         yield "bar", True
 
