@@ -1,3 +1,4 @@
+import time
 import mr
 import routers
 
@@ -19,6 +20,7 @@ def test_foobar():
     assert len(results) == 1
     print results
     assert results[0].value == 2
+
 
 @routers.test_multi
 def test_recursive():

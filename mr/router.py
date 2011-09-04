@@ -37,6 +37,10 @@ class Router(object):
             if any(filter_(item) for filter_ in self.filters[pattern]):
                 return
 
+        self._save_fed_data(pattern, item, reduced)
+
+    def _save_fed_data(self, pattern, item, reduced):
+        """Save an item to the appropriate location."""
         repo = self.data if not reduced else self.reduced_data
         if pattern not in repo:
             repo[pattern] = []
